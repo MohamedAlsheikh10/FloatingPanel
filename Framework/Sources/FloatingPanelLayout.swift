@@ -134,6 +134,8 @@ public class FloatingPanelDefaultLayout: FloatingPanelLayout {
         case .half: return 262.0
         case .tip: return 69.0
         case .hidden: return nil
+        case .withOutImage: return 200
+            
         }
     }
 }
@@ -183,6 +185,7 @@ class FloatingPanelLayoutAdapter {
     private var fullConstraints: [NSLayoutConstraint] = []
     private var halfConstraints: [NSLayoutConstraint] = []
     private var tipConstraints: [NSLayoutConstraint] = []
+    private var withOutImageConstraints: [NSLayoutConstraint] = []
     private var offConstraints: [NSLayoutConstraint] = []
     private var interactiveTopConstraint: NSLayoutConstraint?
     private var bottomConstraint: NSLayoutConstraint?
@@ -203,6 +206,9 @@ class FloatingPanelLayoutAdapter {
     private var tipInset: CGFloat {
         return layout.insetFor(position: .tip) ?? 0.0
     }
+    private var withOutImage: CGFloat {
+          return layout.insetFor(position: .withOutImage) ?? 0.0
+      }
     private var hiddenInset: CGFloat {
         return layout.insetFor(position: .hidden) ?? 0.0
     }
@@ -270,6 +276,14 @@ class FloatingPanelLayoutAdapter {
             }
         case .hidden:
             return surfaceView.superview!.bounds.height - hiddenInset
+        case .withOutImage:
+            switch layout.positionReference {
+                      case .fromSafeArea:
+                          return surfaceView.superview!.bounds.height - (safeAreaInsets.bottom + withOutImage)
+                      case .fromSuperview:
+                          return surfaceView.superview!.bounds.height - withOutImage
+                      }
+     
         }
     }
 
@@ -302,11 +316,24 @@ class FloatingPanelLayoutAdapter {
                   ", content(height) =", surfaceView.contentView?.frame.height ?? 0.0,
                   ", content safe area(bottom) =", safeAreaBottom)
     }
-
+    func gt() -> [NSLayoutConstraint]{
+        let bottomAnchor: NSLayoutYAxisAnchor = {
+                  if layout.positionReference == .fromSuperview {
+                      return vc.view.bottomAnchor
+                  } else {
+                      return vc.layoutGuide.bottomAnchor
+                  }
+              }()
+        tipConstraints = [
+                   surfaceView.topAnchor.constraint(equalTo: bottomAnchor,
+                                                    constant: -tipInset),
+               ]
+        return tipConstraints
+    }
     func prepareLayout(in vc: FloatingPanelController) {
         self.vc = vc
-
-        NSLayoutConstraint.deactivate(fixedConstraints + fullConstraints + halfConstraints + tipConstraints + offConstraints)
+    
+        NSLayoutConstraint.deactivate(fixedConstraints + fullConstraints + halfConstraints + tipConstraints + withOutImageConstraints + offConstraints)
         NSLayoutConstraint.deactivate(constraint: self.heightConstraint)
         self.heightConstraint = nil
         NSLayoutConstraint.deactivate(constraint: self.bottomConstraint)
@@ -367,7 +394,10 @@ class FloatingPanelLayoutAdapter {
             surfaceView.topAnchor.constraint(equalTo: bottomAnchor,
                                              constant: -tipInset),
         ]
-
+withOutImageConstraints  = [
+           surfaceView.topAnchor.constraint(equalTo: bottomAnchor,
+                                            constant: -withOutImage),
+       ]
         offConstraints = [
             surfaceView.topAnchor.constraint(equalTo:vc.view.bottomAnchor,
                                              constant: -hiddenInset),
@@ -376,7 +406,7 @@ class FloatingPanelLayoutAdapter {
 
     func startInteraction(at state: FloatingPanelPosition, offset: CGPoint = .zero) {
         guard self.interactiveTopConstraint == nil else { return }
-        NSLayoutConstraint.deactivate(fullConstraints + halfConstraints + tipConstraints + offConstraints)
+        NSLayoutConstraint.deactivate(fullConstraints + halfConstraints + tipConstraints + withOutImageConstraints + offConstraints)
 
         let interactiveTopConstraint: NSLayoutConstraint
         switch layout.positionReference {
@@ -520,16 +550,18 @@ class FloatingPanelLayoutAdapter {
             state = layout.initialPosition
         }
 
-        NSLayoutConstraint.deactivate(fullConstraints + halfConstraints + tipConstraints + offConstraints)
+        NSLayoutConstraint.deactivate(fullConstraints + halfConstraints + tipConstraints + withOutImageConstraints + offConstraints)
         switch state {
         case .full:
             NSLayoutConstraint.activate(fullConstraints)
         case .half:
             NSLayoutConstraint.activate(halfConstraints)
         case .tip:
-            NSLayoutConstraint.activate(tipConstraints)
+            NSLayoutConstraint.activate(gt())
         case .hidden:
             NSLayoutConstraint.activate(offConstraints)
+        case .withOutImage:
+             NSLayoutConstraint.activate(withOutImageConstraints)
         }
     }
 
@@ -614,3 +646,5 @@ class FloatingPanelLayoutAdapter {
         }
     }
 }
+
+
